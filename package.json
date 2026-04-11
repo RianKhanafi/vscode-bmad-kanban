@@ -4,10 +4,17 @@
   "description": "Visualize and manage BMAD Method workflows as a Kanban board inside VS Code",
   "version": "0.1.0",
   "publisher": "bmad",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RianKhanafi/vscode-bmad-kanban"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Visualization",
     "Other"
   ],
   "activationEvents": [],
