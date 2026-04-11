@@ -76,7 +76,8 @@ export function getBoardState(workspaceRoot: string, yamlPath: string): BoardSta
 
         // Files with no recognized status → Documents column (unless numeric-prefixed)
         const isDocument = !isNumericStory && statusFromYaml === null && statusFromFile === null;
-        const status = isDocument ? 'documents' : (statusFromYaml ?? statusFromFile ?? DEFAULT_COLUMN);
+        // File status takes priority over YAML so manual .md edits are always reflected
+        const status = isDocument ? 'documents' : (statusFromFile ?? statusFromYaml ?? DEFAULT_COLUMN);
         if (!columns[status]) {
             columns[status] = [];
         }

@@ -1001,7 +1001,7 @@ export default function App() {
         clearTimeout(undoTimerRef.current);
         setUndoState({ storyId, fromStatus: sourceStatus, toStatus: newStatus, title: movedCard?.title ?? storyId });
         undoTimerRef.current = setTimeout(() => setUndoState(null), 5000);
-        vscode.postMessage({ type: 'moveCard', storyId, newStatus });
+        vscode.postMessage({ type: 'moveCard', storyId, newStatus, filePath: movedCard?.filePath });
     }, [boardState]);
 
     // Modal status dropdown delegates to dispatchMove
@@ -1032,7 +1032,7 @@ export default function App() {
             next.columns[fromStatus] = [...(next.columns[fromStatus] ?? []), movedCard];
         }
         setOptimisticState(next);
-        vscode.postMessage({ type: 'moveCard', storyId, newStatus: fromStatus });
+        vscode.postMessage({ type: 'moveCard', storyId, newStatus: fromStatus, filePath: movedCard?.filePath });
     }, [undoState, optimisticState, boardState]);
 
     // Context menu right-click handler on Card

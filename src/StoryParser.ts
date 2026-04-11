@@ -36,7 +36,7 @@ function parsePlainFields(content: string): Record<string, string> {
     // e.g. "Status: done" or "Epic: Epic 1"
     const fields: Record<string, string> = {};
     for (const line of content.split('\n')) {
-        if (/^##?\s/.test(line)) break; // stop at first heading
+        if (/^##\s/.test(line)) break; // stop at first ## section heading (# title is allowed before)
         const m = line.match(/^([A-Za-z][A-Za-z0-9_ ]{0,30}):\s+(.+)$/);
         if (m) {
             const key = m[1].trim().toLowerCase().replace(/\s+/g, '_');
@@ -115,6 +115,52 @@ export function parse(filePath: string): StoryCard {
     delete metadata['story_id'];
 
     return { id, title, filePath, description, metadata };
+}
+
+/**
+ * Update the status field inside a .md file in-place.
+ * Handles three formats:
+ *   **Status:** value       (bold key, plain value)
+ *   **Status: value**       (fully bold)
+ *   Status: value           (plain)
+ * If none found, inserts "Status: {newStatus}" after the frontmatter block.
+ */
+export function updateStatusInFile(filePath: string, newStatus: string): void {
+    let raw = fs.readFileSync(filePath, 'utf8');
+
+    // Pattern 1: **Status:** value  or  **Story Status:** value
+    const boldKeyRe = /^(\*\*(?:Story\s+)?Status:\*\*\s*).+$/im;
+    if (boldKeyRe.test(raw)) {
+        raw = raw.replace(boldKeyRe, `$1${newStatus}`);
+        fs.writeFileSync(filePath, raw, 'utf8');
+        return;
+    }
+
+    // Pattern 2: **Status: value**  (fully bold, value inside markers)
+    const boldFullRe = /^\*\*(?:Story\s+)?Status:\s*[^*\n]+\*\*$/im;
+    if (boldFullRe.test(raw)) {
+        raw = raw.replace(boldFullRe, `**Status: ${newStatus}**`);
+        fs.writeFileSync(filePath, raw, 'utf8');
+        return;
+    }
+
+    // Pattern 3: plain  Status: value  line
+    const plainRe = /^((?:Story\s+)?Status):\s+.+$/im;
+    if (plainRe.test(raw)) {
+        raw = raw.replace(plainRe, `$1: ${newStatus}`);
+        fs.writeFileSync(filePath, raw, 'utf8');
+        return;
+    }
+
+    // No status field found — insert after frontmatter (--- block) or at the very top
+    const fmMatch = raw.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+    if (fmMatch) {
+        const insertAt = fmMatch.index! + fmMatch[0].length;
+        raw = raw.slice(0, insertAt) + `Status: ${newStatus}\n\n` + raw.slice(insertAt);
+    } else {
+        raw = `Status: ${newStatus}\n\n` + raw;
+    }
+    fs.writeFileSync(filePath, raw, 'utf8');
 }
 
 export function discoverStories(workspaceRoot: string): StoryCard[] {

@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { getBoardState, BoardState } from './BoardDataAggregator';
 import { SprintStateAdapter } from './SprintStateAdapter';
+import { updateStatusInFile } from './StoryParser';
 
 function resolveSprintYaml(workspaceRoot: string): string {
     // Search recursively up to 4 levels deep for sprint-status.yaml / .yml
@@ -88,7 +89,7 @@ export class KanbanPanel {
             (message: { type: string; storyId?: string; newStatus?: string; filePath?: string }) => {
                 switch (message.type) {
                     case 'moveCard':
-                        this._handleMoveCard(message.storyId!, message.newStatus!);
+                        this._handleMoveCard(message.storyId!, message.newStatus!, message.filePath);
                         break;
                     case 'openFile':
                         this._handleOpenFile(message.filePath!);
@@ -106,11 +107,17 @@ export class KanbanPanel {
         );
     }
 
-    private _handleMoveCard(storyId: string, newStatus: string): void {
+    private _handleMoveCard(storyId: string, newStatus: string, filePath?: string): void {
         try {
-            // Only pass the single changed entry — write() patches in-place
-            this._adapter.write(this._yamlPath, { [storyId]: newStatus });
-            this._sendBoardState();
+            // Write status into the .md file so the source of truth stays in the file
+            if (filePath && fs.existsSync(filePath)) {
+                updateStatusInFile(filePath, newStatus);
+                // The .md file watcher will trigger a board refresh automatically
+            } else {
+                // Fallback: persist to sprint-status.yaml for stories without a file path
+                this._adapter.write(this._yamlPath, { [storyId]: newStatus });
+                this._sendBoardState();
+            }
         } catch (err) {
             this._panel.webview.postMessage({
                 type: 'moveError',
