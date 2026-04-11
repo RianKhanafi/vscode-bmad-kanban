@@ -1,0 +1,13 @@
+.vscode/**
+.vscode-test/**
+webview-src/**
+src/test/**
+out/**
+out-webview/**
+node_modules/**
+**/*.map
+*.vsix
+.github/**
+openspec/**
+tsconfig*.json
+.vscode-test.mjs

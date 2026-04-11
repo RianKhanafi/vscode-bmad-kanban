@@ -1,0 +1,56 @@
+{
+  "name": "vscode-bmad-kanban",
+  "displayName": "BMAD Kanban Board",
+  "description": "Visualize and manage BMAD Method workflows as a Kanban board inside VS Code",
+  "version": "0.1.0",
+  "publisher": "bmad",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "bmad-kanban.openBoard",
+        "title": "BMAD: Open Kanban Board",
+        "category": "BMAD"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:ext && npm run build:webview",
+    "build:ext": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "build:webview": "esbuild webview-src/index.tsx --bundle --outfile=dist/webview.js --format=iife --minify",
+    "watch": "npm run watch:ext & npm run watch:webview",
+    "watch:ext": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
+    "watch:webview": "esbuild webview-src/index.tsx --bundle --outfile=dist/webview.js --format=iife --watch",
+    "compile": "tsc --noEmit",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "gray-matter": "^4.0.3",
+    "js-yaml": "^4.1.0",
+    "marked": "^18.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/marked": "^6.0.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-cli": "^0.0.6",
+    "@vscode/test-electron": "^2.3.8",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  }
+}
