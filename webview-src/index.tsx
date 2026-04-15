@@ -990,6 +990,96 @@ style.textContent = `
     font-size: 12px;
     z-index: 1000;
   }
+
+  /* ---- Empty State ---- */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 48px 32px;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .empty-state-icon {
+    font-size: 48px;
+    line-height: 1;
+    opacity: 0.7;
+  }
+
+  .empty-state-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+  }
+
+  .empty-state-body {
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground);
+    line-height: 1.6;
+    max-width: 480px;
+  }
+
+  .empty-state-body ul {
+    text-align: left;
+    margin: 8px 0 0;
+    padding-left: 1.4em;
+  }
+
+  .empty-state-body li {
+    margin: 4px 0;
+  }
+
+  .empty-state-body code {
+    background: var(--vscode-textCodeBlock-background, rgba(128,128,128,0.15));
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 0.9em;
+  }
+
+  /* ---- Mockups Grid ---- */
+  .mockups-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px;
+    flex: 1;
+    align-content: flex-start;
+    overflow-y: auto;
+  }
+
+  .card-mockup {
+    flex: 0 0 220px;
+    background: var(--vscode-input-background);
+    border: 1px dashed var(--vscode-input-border, #555);
+    border-radius: 6px;
+    padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.1s;
+  }
+
+  .card-mockup:hover {
+    border-color: var(--vscode-focusBorder);
+    border-style: solid;
+  }
+
+  .card-mockup:focus {
+    outline: 2px solid var(--vscode-focusBorder, #007acc);
+    outline-offset: 1px;
+  }
+
+  .card-mockup-type {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
 `;
 document.head.appendChild(style);
 

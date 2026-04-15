@@ -2,12 +2,22 @@ import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
 
+export type ArtifactFolderType = 'ticket' | 'document' | 'mockup';
+
+export interface FolderConfig {
+    ticketFolders: string[];
+    documentFolders: string[];
+    mockupFolders: string[];
+}
+
 export interface StoryCard {
     id: string;
     title: string;
     filePath: string;
     description?: string;
     metadata: Record<string, unknown>;
+    sourceType?: ArtifactFolderType;
+    fileType?: 'md' | 'html';
 }
 
 function parseBoldFields(content: string): Record<string, string> {
@@ -49,7 +59,7 @@ function parsePlainFields(content: string): Record<string, string> {
     return fields;
 }
 
-export function parse(filePath: string): StoryCard {
+export function parse(filePath: string, sourceType?: ArtifactFolderType): StoryCard {
     const raw = fs.readFileSync(filePath, 'utf8');
     const { data, content } = matter(raw);
 
@@ -114,7 +124,7 @@ export function parse(filePath: string): StoryCard {
     // Remove story_id from display metadata (already used as id)
     delete metadata['story_id'];
 
-    return { id, title, filePath, description, metadata };
+    return { id, title, filePath, description, metadata, sourceType };
 }
 
 /**
@@ -163,13 +173,25 @@ export function updateStatusInFile(filePath: string, newStatus: string): void {
     fs.writeFileSync(filePath, raw, 'utf8');
 }
 
-export function discoverStories(workspaceRoot: string): StoryCard[] {
+export function discoverStories(workspaceRoot: string, config: FolderConfig): StoryCard[] {
     const stories: StoryCard[] = [];
-    collectMdFiles(workspaceRoot, workspaceRoot, stories);
+    const entries: Array<[string[], ArtifactFolderType]> = [
+        [config.ticketFolders,   'ticket'],
+        [config.documentFolders, 'document'],
+        [config.mockupFolders,   'mockup'],
+    ];
+    for (const [folders, folderType] of entries) {
+        for (const folderRelPath of folders) {
+            const folderPath = path.join(workspaceRoot, folderRelPath);
+            if (fs.existsSync(folderPath)) {
+                collectMdFiles(folderPath, folderType, stories);
+            }
+        }
+    }
     return stories;
 }
 
-function collectMdFiles(root: string, dir: string, out: StoryCard[]): void {
+function collectMdFiles(dir: string, sourceType: ArtifactFolderType, out: StoryCard[]): void {
     let entries: fs.Dirent[];
     try {
         entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -183,13 +205,23 @@ function collectMdFiles(root: string, dir: string, out: StoryCard[]): void {
         }
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-            collectMdFiles(root, fullPath, out);
+            collectMdFiles(fullPath, sourceType, out);
         } else if (entry.isFile() && entry.name.endsWith('.md')) {
             try {
-                out.push(parse(fullPath));
+                out.push(parse(fullPath, sourceType));
             } catch {
                 // Skip unparseable files silently
             }
+        } else if (entry.isFile() && entry.name.endsWith('.html') && sourceType === 'mockup') {
+            const name = path.basename(entry.name, '.html');
+            out.push({
+                id: name,
+                title: name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                filePath: fullPath,
+                metadata: {},
+                sourceType: 'mockup',
+                fileType: 'html',
+            });
         }
     }
 }

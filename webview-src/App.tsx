@@ -899,6 +899,50 @@ function Column({ status, label, cards, totalCount, collapsed, sortKey, focusedC
     );
 }
 
+// ---- Mockups View -------------------------------------------------------
+
+interface MockupsViewProps {
+    cards: StoryCard[];
+    onCardClick: (card: StoryCard, status: string) => void;
+    onOpenHtml: (filePath: string) => void;
+}
+
+function MockupsView({ cards, onCardClick, onOpenHtml }: MockupsViewProps) {
+    if (cards.length === 0) {
+        return (
+            <div className="empty-state">
+                <div className="empty-state-icon">🖼️</div>
+                <div className="empty-state-title">No mockups yet</div>
+                <div className="empty-state-body">
+                    Add <code>.md</code> or <code>.html</code> files to a <code>mockups/</code> folder to see them here.
+                </div>
+            </div>
+        );
+    }
+    return (
+        <div className="mockups-grid">
+            {cards.map(card => {
+                const isHtml = card.fileType === 'html';
+                return (
+                    <div
+                        key={card.id}
+                        className="card card-mockup"
+                        tabIndex={0}
+                        title={isHtml ? 'Open in browser' : card.title}
+                        onClick={() => isHtml ? onOpenHtml(card.filePath) : onCardClick(card, 'mockups')}
+                    >
+                        <div className="card-mockup-type">{isHtml ? '🌐 HTML' : '📄 MD'}</div>
+                        <div className="card-title">{card.title}</div>
+                        {card.description && (
+                            <div className="card-description">{card.description}</div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 // ---- Board --------------------------------------------------------------
 
 export default function App() {
@@ -917,11 +961,17 @@ export default function App() {
     const [undoState, setUndoState] = useState<{ storyId: string; fromStatus: string; toStatus: string; title: string } | null>(null);
     const undoTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; storyId: string; currentStatus: string } | null>(null);
-    // Task 2.1: view mode toggle
-    type ViewMode = 'kanban' | 'sprint' | 'swimlane';
+    type ViewMode = 'kanban' | 'sprint' | 'swimlane' | 'mockups';
     const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
     const activeBoardState = optimisticState ?? boardState;
+
+    // Auto-switch away from mockups view if the mockups folder disappears
+    useEffect(() => {
+        if (viewMode === 'mockups' && !(activeBoardState?.hasMockups)) {
+            setViewMode('kanban');
+        }
+    }, [activeBoardState?.hasMockups, viewMode]);
 
     useEffect(() => {
         function handleMessage(event: MessageEvent) {
@@ -1124,6 +1174,26 @@ export default function App() {
         return <div style={{ padding: 16, color: 'var(--vscode-foreground)' }}>Loading board…</div>;
     }
 
+    if (activeBoardState.emptyState) {
+        return (
+            <div className="empty-state">
+                <div className="empty-state-icon">📋</div>
+                <div className="empty-state-title">No artifact folders found</div>
+                <div className="empty-state-body">
+                    BMAD Kanban looks for <code>.md</code> files in these folders:
+                    <ul>
+                        <li><code>implementation-artifacts/</code> — tickets, stories, tasks</li>
+                        <li><code>planning-artifacts/</code> — planning documents</li>
+                        <li><code>mockups/</code> or <code>_mockups/</code> — UI mockups</li>
+                    </ul>
+                    Create one of these folders in your workspace and add some <code>.md</code> files to get started.
+                </div>
+            </div>
+        );
+    }
+
+    const hasMockups = activeBoardState.hasMockups ?? false;
+    const mockupsCards = activeBoardState.mockupsCards ?? [];
     const docCards = filteredBoardState.columns['documents'] ?? [];
 
     return (
@@ -1138,6 +1208,12 @@ export default function App() {
                             onClick={() => setViewMode(mode)}
                         >{mode.charAt(0).toUpperCase() + mode.slice(1)}</button>
                     ))}
+                    {hasMockups && (
+                        <button
+                            className={`view-btn${viewMode === 'mockups' ? ' active' : ''}`}
+                            onClick={() => setViewMode('mockups')}
+                        >Mockups</button>
+                    )}
                 </div>
                 <StatusDistributionBar columns={activeBoardState.columns} />
                 <BurndownSparkline completedDates={activeBoardState.completedDates ?? []} />
@@ -1222,6 +1298,13 @@ export default function App() {
                         focusedCardId={focusedCardId}
                         onFocusCard={setFocusedCardId}
                         onContextMenu={handleContextMenu}
+                    />
+                )}
+                {viewMode === 'mockups' && hasMockups && (
+                    <MockupsView
+                        cards={mockupsCards}
+                        onCardClick={handleCardClick}
+                        onOpenHtml={(filePath) => vscode.postMessage({ type: 'openExternal', url: `file://${filePath}` })}
                     />
                 )}
             </div>

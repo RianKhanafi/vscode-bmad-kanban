@@ -26,7 +26,30 @@
         "title": "BMAD: Open Kanban Board",
         "category": "BMAD"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "BMAD Kanban",
+      "properties": {
+        "bmadKanban.ticketFolders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["implementation-artifacts"],
+          "description": "Workspace-relative folder paths whose .md files are treated as tickets (shown on Kanban, Sprint, and Swimlane boards)."
+        },
+        "bmadKanban.documentFolders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["planning-artifacts"],
+          "description": "Workspace-relative folder paths whose .md files are treated as planning documents (shown in the Documents column)."
+        },
+        "bmadKanban.mockupFolders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["mockups", "_mockups"],
+          "description": "Workspace-relative folder paths whose .md files are treated as mockups (shown on the Mockups board)."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run build",

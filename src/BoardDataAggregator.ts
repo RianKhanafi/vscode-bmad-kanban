@@ -1,4 +1,4 @@
-import { discoverStories, StoryCard } from './StoryParser';
+import { discoverStories, StoryCard, FolderConfig } from './StoryParser';
 import { SprintStateAdapter, inferEpicGroups } from './SprintStateAdapter';
 import * as path from 'path';
 
@@ -7,6 +7,9 @@ export type BoardState = {
     completedDates: string[];
     sprintGroups: Record<string, StoryCard[]>;
     epicGroups: Record<string, StoryCard[]>;
+    mockupsCards: StoryCard[];
+    hasMockups: boolean;
+    emptyState: boolean;
 };
 
 const DEFAULT_COLUMN = 'todo';
@@ -51,17 +54,25 @@ function normalizeStatus(raw: string): string | null {
     return null;
 }
 
-export function getBoardState(workspaceRoot: string, yamlPath: string): BoardState {
+export function getBoardState(workspaceRoot: string, yamlPath: string, config: FolderConfig): BoardState {
     const adapter = new SprintStateAdapter();
     const stateMap = adapter.read(yamlPath);
-    const stories = discoverStories(workspaceRoot);
+    const stories = discoverStories(workspaceRoot, config);
 
     const columns: { [status: string]: StoryCard[] } = {};
     for (const col of COLUMN_ORDER) {
         columns[col] = [];
     }
 
+    const mockupsCards: StoryCard[] = [];
+
     for (const story of stories) {
+        // Mockup cards go to their own collection, not the kanban columns
+        if (story.sourceType === 'mockup') {
+            mockupsCards.push(story);
+            continue;
+        }
+
         const rawYaml = stateMap[story.id];
         const rawFile = typeof story.metadata['status'] === 'string'
             ? (story.metadata['status'] as string)
@@ -70,12 +81,9 @@ export function getBoardState(workspaceRoot: string, yamlPath: string): BoardSta
         const statusFromYaml = rawYaml ? normalizeStatus(rawYaml) : null;
         const statusFromFile = rawFile ? normalizeStatus(rawFile) : null;
 
-        // Files whose basename starts with a digit are always tickets (never Documents)
-        const basenameStory = path.basename(story.filePath, '.md');
-        const isNumericStory = /^\d/.test(basenameStory);
+        // Only planning-artifacts files are documents; implementation-artifacts are always tickets
+        const isDocument = story.sourceType === 'document';
 
-        // Files with no recognized status → Documents column (unless numeric-prefixed)
-        const isDocument = !isNumericStory && statusFromYaml === null && statusFromFile === null;
         // File status takes priority over YAML so manual .md edits are always reflected
         const status = isDocument ? 'documents' : (statusFromFile ?? statusFromYaml ?? DEFAULT_COLUMN);
         if (!columns[status]) {
@@ -83,6 +91,9 @@ export function getBoardState(workspaceRoot: string, yamlPath: string): BoardSta
         }
         columns[status].push(story);
     }
+
+    const hasMockups = mockupsCards.length > 0;
+    const emptyState = stories.length === 0;
 
     // Task 1.2: collect completed dates from done-column cards
     const completedDates: string[] = [];
@@ -126,5 +137,5 @@ export function getBoardState(workspaceRoot: string, yamlPath: string): BoardSta
         epicGroups[epic].push(card);
     }
 
-    return { columns, completedDates, sprintGroups, epicGroups };
+    return { columns, completedDates, sprintGroups, epicGroups, mockupsCards, hasMockups, emptyState };
 }

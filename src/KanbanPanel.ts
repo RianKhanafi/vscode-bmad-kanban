@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { getBoardState, BoardState } from './BoardDataAggregator';
 import { SprintStateAdapter } from './SprintStateAdapter';
-import { updateStatusInFile } from './StoryParser';
+import { updateStatusInFile, FolderConfig } from './StoryParser';
 
 function resolveSprintYaml(workspaceRoot: string): string {
     // Search recursively up to 4 levels deep for sprint-status.yaml / .yml
@@ -79,8 +79,43 @@ export class KanbanPanel {
         KanbanPanel.currentPanel = new KanbanPanel(panel, workspaceRoot, yamlPath);
     }
 
+    private _getFolderConfig(): FolderConfig {
+        const cfg = vscode.workspace.getConfiguration('bmadKanban');
+
+        // If the user has explicitly set any of the folder settings, use them as-is.
+        const hasExplicitConfig =
+            cfg.inspect('ticketFolders')?.workspaceValue !== undefined ||
+            cfg.inspect('documentFolders')?.workspaceValue !== undefined ||
+            cfg.inspect('mockupFolders')?.workspaceValue !== undefined;
+
+        if (hasExplicitConfig) {
+            return {
+                ticketFolders:   cfg.get<string[]>('ticketFolders',   ['implementation-artifacts']),
+                documentFolders: cfg.get<string[]>('documentFolders', ['planning-artifacts']),
+                mockupFolders:   cfg.get<string[]>('mockupFolders',   ['mockups', '_mockups']),
+            };
+        }
+
+        // Auto-detect: if _bmad-output exists at workspace root, look inside it.
+        const bmadOutput = path.join(this._workspaceRoot, '_bmad-output');
+        if (fs.existsSync(bmadOutput)) {
+            return {
+                ticketFolders:   ['_bmad-output/implementation-artifacts'],
+                documentFolders: ['_bmad-output/planning-artifacts'],
+                mockupFolders:   ['_bmad-output/mockups', '_bmad-output/_mockups'],
+            };
+        }
+
+        // Default: artifact folders at workspace root.
+        return {
+            ticketFolders:   ['implementation-artifacts'],
+            documentFolders: ['planning-artifacts'],
+            mockupFolders:   ['mockups', '_mockups'],
+        };
+    }
+
     private _sendBoardState(): void {
-        const state: BoardState = getBoardState(this._workspaceRoot, this._yamlPath);
+        const state: BoardState = getBoardState(this._workspaceRoot, this._yamlPath, this._getFolderConfig());
         this._panel.webview.postMessage({ type: 'boardLoaded', data: state });
     }
 
@@ -152,17 +187,36 @@ export class KanbanPanel {
         }
     }
 
-    // 6.1-6.4: File system watchers
+    // File system watchers scoped to configured artifact folders
     private _registerFileWatchers(): void {
-        const mdWatcher = vscode.workspace.createFileSystemWatcher('**/*.md');
-        mdWatcher.onDidCreate(() => this._scheduleRefresh(), null, this._disposables);
-        mdWatcher.onDidChange(() => this._scheduleRefresh(), null, this._disposables);
-        mdWatcher.onDidDelete(() => this._scheduleRefresh(), null, this._disposables);
-        this._disposables.push(mdWatcher);
+        const config = this._getFolderConfig();
+        const allFolders = [
+            ...config.ticketFolders,
+            ...config.documentFolders,
+            ...config.mockupFolders,
+        ];
+        for (const folder of allFolders) {
+            // Normalise path separators and build a glob relative to workspace root
+            const normalized = folder.replace(/\\/g, '/').replace(/\/$/, '');
+            const glob = new vscode.RelativePattern(this._workspaceRoot, `${normalized}/**/*.md`);
+            const watcher = vscode.workspace.createFileSystemWatcher(glob);
+            watcher.onDidCreate(() => this._scheduleRefresh(), null, this._disposables);
+            watcher.onDidChange(() => this._scheduleRefresh(), null, this._disposables);
+            watcher.onDidDelete(() => this._scheduleRefresh(), null, this._disposables);
+            this._disposables.push(watcher);
+        }
 
         const yamlWatcher = vscode.workspace.createFileSystemWatcher('**/sprint-status.{yml,yaml}');
         yamlWatcher.onDidChange(() => this._scheduleRefresh(), null, this._disposables);
         this._disposables.push(yamlWatcher);
+
+        // Refresh board when folder config changes in settings
+        const configWatcher = vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('bmadKanban')) {
+                this._scheduleRefresh();
+            }
+        });
+        this._disposables.push(configWatcher);
     }
 
     private _scheduleRefresh(): void {
