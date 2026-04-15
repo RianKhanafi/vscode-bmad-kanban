@@ -10,12 +10,15 @@ A VS Code extension that renders a full-featured Kanban board for projects built
 
 - [Getting Started](#getting-started)
 - [Board Views](#board-views)
+  - [Mockups View](#mockups-view)
 - [Filter & Search](#filter--search)
 - [Card Detail Modal](#card-detail-modal)
 - [Column Controls](#column-controls)
 - [Workflow Features](#workflow-features)
 - [Stats & Insights](#stats--insights)
 - [Workspace Setup](#workspace-setup)
+  - [Auto-detection](#auto-detection)
+  - [Custom folder paths](#custom-folder-paths)
 - [Story File Format](#story-file-format)
 - [Development](#development)
 - [Architecture](#architecture)
@@ -29,13 +32,13 @@ A VS Code extension that renders a full-featured Kanban board for projects built
 3. Run **BMAD: Open Kanban Board**
 4. The board opens as a WebView panel showing all your stories grouped by status
 
-The board auto-refreshes whenever a `.md` story file or `sprint-status.yaml` changes on disk.
+The board auto-refreshes whenever a `.md` file inside a watched artifact folder or `sprint-status.yaml` changes on disk.
 
 ---
 
 ## Board Views
 
-The board toolbar contains a **Kanban / Sprint / Swimlane** segmented control to switch between three layouts.
+The board toolbar contains a **Kanban / Sprint / Swimlane / Mockups** segmented control to switch between layouts. The **Mockups** tab is only visible when a `mockups/` or `_mockups/` folder exists in the workspace.
 
 ![alt text](image-1.png)
 
@@ -50,7 +53,7 @@ The classic status-column layout. Stories are grouped into four columns:
 | **Review**      | `review`, `in review`, `ready for review`, `ready for merge`   |
 | **Done**        | `done`, `completed`, `finished`, `merged`, `deployed`          |
 
-A **Documents** column (left side, dashed border) holds `.md` files that have no recognized status and whose filename does **not** start with a digit. Files named `1-0-basic-layout.md`, `2-3-view-profile.md`, etc. are always treated as story tickets regardless of their status fields.
+A **Documents** column (left side, dashed border) holds all `.md` files sourced from the `planning-artifacts/` folder.
 
 ![alt text](image.png)
 
@@ -63,6 +66,13 @@ Groups cards by **epic** from `sprint-status.yaml` key order. Each epic appears 
 Renders a 2D grid: **rows = epics**, **columns = statuses**. Epics are inferred from `sprint-status.yaml` key order (not frontmatter). Each cell shows cards matching that epic × status pair. Epic rows have a progress bar. Cells accept drag-and-drop. Cards with no matching epic appear in an **Unassigned** row.
 
 ![alt text](image-2.png)
+
+### Mockups View
+
+Displays all files from the `mockups/` or `_mockups/` folder as a grid of cards. This tab is hidden when no mockups folder exists.
+
+- **`.md` mockups** — click to open the preview modal
+- **`.html` mockups** — click to open in your default browser
 
 ---
 
@@ -204,20 +214,59 @@ The UI automatically adapts to your VS Code theme, keeping everything in sync wi
 
 ## Workspace Setup
 
-Your workspace must contain story `.md` files. The extension searches for them recursively up to 4 directory levels deep. The YAML state file is also discovered automatically.
+The extension only loads `.md` (and `.html` for mockups) files from specific **artifact folders**. Files anywhere else in the workspace are ignored.
 
-### Recommended BMAD structure
+### Folder roles
+
+| Folder | What goes here | Board destination |
+|---|---|---|
+| `implementation-artifacts/` | Stories, tasks, tickets | Kanban / Sprint / Swimlane columns |
+| `planning-artifacts/` | PRDs, briefs, architecture docs | Documents column |
+| `mockups/` or `_mockups/` | `.md` or `.html` wireframes | Mockups board tab |
+
+### Auto-detection
+
+If a `_bmad-output/` folder exists at the workspace root, the extension automatically looks for the three artifact folders **inside it** — no configuration needed:
 
 ```
 <workspace>/
-├── sprint-status.yaml          # workflow state (created automatically if missing)
-├── epics/
-│   └── <epic-name>/
-│       └── stories/
-│           └── <story-name>.md
-└── docs/
-    └── any-doc.md              # appears in Documents column
+├── _bmad-output/
+│   ├── implementation-artifacts/
+│   │   └── story-login.md
+│   ├── planning-artifacts/
+│   │   └── prd.md
+│   └── mockups/
+│       ├── login.html
+│       └── dashboard.html
+└── sprint-status.yaml
 ```
+
+Otherwise the extension expects the folders directly at the workspace root:
+
+```
+<workspace>/
+├── implementation-artifacts/
+│   └── story-login.md
+├── planning-artifacts/
+│   └── prd.md
+├── mockups/
+│   └── login.html
+└── sprint-status.yaml
+```
+
+### Custom folder paths
+
+For non-standard project layouts add a `.vscode/settings.json` to the workspace:
+
+```json
+{
+  "bmadKanban.ticketFolders":   ["src/tickets"],
+  "bmadKanban.documentFolders": ["docs/planning"],
+  "bmadKanban.mockupFolders":   ["design/mockups"]
+}
+```
+
+Each setting is an array, so multiple folders of the same type are supported. Paths are relative to the workspace root. Explicit settings always override auto-detection.
 
 ### `sprint-status.yaml` format
 
@@ -330,5 +379,6 @@ nvm use 20 && vsce package --no-dependencies --allow-missing-repository
 
 - **`sprint-status.yaml` is the only writable file** — story `.md` files are never modified
 - All file I/O runs on the extension host; the WebView is a pure display + interaction layer
-- File watchers debounce refreshes to 300ms and are disposed when the panel is closed
+- File watchers are scoped to configured artifact folder globs and debounce refreshes to 300ms
+- Changing `bmadKanban.*` settings triggers an automatic board refresh
 - The webview bundle uses esbuild (no webpack); React 18, no charting libraries
